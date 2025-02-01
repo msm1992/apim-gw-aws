@@ -38,10 +38,158 @@
                 <artifactId>org.wso2.carbon.apimgt.api</artifactId>
                 <version>${carbon.apimgt.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-handler</artifactId>
+                <version>4.1.115.Final</version>
+            </dependency>
+
+            <!-- AWS SDK Dependencies -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>aws-sdk-java</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>apigatewayv2</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>apache-client</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>aws-json-protocol</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>aws-core</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>regions</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>http-client-spi</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>utils</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>apache-client</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>apigateway</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+<!--            <dependency>-->
+<!--                <groupId>software.amazon.awssdk</groupId>-->
+<!--                <artifactId>core</artifactId>-->
+<!--                <version>${aws.sdk.version}</version>-->
+<!--            </dependency>-->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>identity-spi</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>retries-spi</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>profiles</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>endpoints-spi</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>http-auth-spi</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>auth</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>http-auth-aws</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>aws-json-protocol</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>metrics-spi</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>protocol-core</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>json-utils</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>third-party-jackson-core</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>checksums</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>checksums-spi</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>http-auth</artifactId>
+                <version>${aws.sdk.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <repositories>
+        <repository>
+            <id>maven</id>
+            <name>maven1</name>
+            <url>https://repo1.maven.org/maven2/</url>
+            <releases>
+                <enabled>true</enabled>
+                <updatePolicy>daily</updatePolicy>
+                <checksumPolicy>ignore</checksumPolicy>
+            </releases>
+        </repository>
         <repository>
             <id>wso2-nexus</id>
             <name>WSO2 internal Repository</name>
@@ -111,33 +259,14 @@
         </pluginRepository>
     </pluginRepositories>
 
-<!--    <distributionManagement>-->
-<!--        <repository>-->
-<!--            <id>nexus-releases</id>-->
-<!--            <name>WSO2 Release Distribution Repository</name>-->
-<!--            <url>https://maven.wso2.org/nexus/service/local/staging/deploy/maven2/</url>-->
-<!--        </repository>-->
-<!--        <snapshotRepository>-->
-<!--            <id>wso2.snapshots</id>-->
-<!--            <name>Apache Snapshot Repository</name>-->
-<!--            <url>https://maven.wso2.org/nexus/content/repositories/snapshots/</url>-->
-<!--        </snapshotRepository>-->
-<!--    </distributionManagement>-->
-
-<!--    <scm>-->
-<!--        <connection>scm:git:https://github.com/wso2-extensions/apim-gw-aws.git</connection>-->
-<!--        <url>https://github.com/wso2-extensions/apim-gw-aws.git</url>-->
-<!--        <developerConnection>scm:git:https://github.com/wso2-extensions/apim-gw-aws.git</developerConnection>-->
-<!--        <tag>HEAD</tag>-->
-<!--    </scm>-->
-
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <carbon.p2.plugin.version>1.5.3</carbon.p2.plugin.version>
-        <carbon.apimgt.version>9.30.100-SNAPSHOT</carbon.apimgt.version>
+        <carbon.apimgt.version>9.31.3-SNAPSHOT</carbon.apimgt.version>
+        <aws.sdk.version>2.29.22</aws.sdk.version>
     </properties>
 
 </project>
