@@ -265,7 +265,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <carbon.p2.plugin.version>1.5.3</carbon.p2.plugin.version>
-        <carbon.apimgt.version>9.31.3-SNAPSHOT</carbon.apimgt.version>
+        <carbon.apimgt.version>9.31.6-SNAPSHOT</carbon.apimgt.version>
         <aws.sdk.version>2.29.22</aws.sdk.version>
     </properties>
 
