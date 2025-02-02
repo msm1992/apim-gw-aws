@@ -25,9 +25,8 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
 
     @Override
     public boolean deploy(API api, Environment environment) throws DeployerException {
-        String openAPIDefinition = api.getSwaggerDefinition();
         // Create API in AWS'
-        AWSAPIUtil.importRestAPI(openAPIDefinition);
+        AWSAPIUtil.importRestAPI(api);
         log.info("API deployed in AWS....");
         return false;
     }
