@@ -4,11 +4,13 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.osgi.service.component.annotations.Component;
 import org.wso2.aws.client.util.AWSAPIUtil;
+import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.api.model.ConfigurationDto;
 import org.wso2.carbon.apimgt.api.model.Environment;
 import org.wso2.carbon.apimgt.impl.deployer.ExternalGatewayDeployer;
 import org.wso2.carbon.apimgt.impl.deployer.exceptions.DeployerException;
+import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,15 +27,25 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
 
     @Override
     public boolean deploy(API api, Environment environment) throws DeployerException {
-        // Create API in AWS'
-        AWSAPIUtil.importRestAPI(api);
-        log.info("API deployed in AWS....");
-        return false;
+        try {
+            String awsApiId = APIUtil.getApiAWSApiMappingByApiId(api.getUuid(), environment.getUuid());
+            if (awsApiId == null) {
+                awsApiId = AWSAPIUtil.importRestAPI(api, environment);
+                APIUtil.addApiAWSApiMapping(api.getUuid(), awsApiId, environment.getUuid());
+            } else {
+                AWSAPIUtil.reimportRestAPI(awsApiId, api, environment);
+            }
+            return true;
+        } catch (APIManagementException e) {
+            throw new DeployerException("Error while deploying API to AWS Gateway", e);
+        }
     }
 
     @Override
-    public boolean undeploy(String s, String s1, String s2, Environment environment) throws DeployerException {
-        return false;
+    public boolean undeploy(String apiID, String apiName, String apiVersion, String apiContext,
+                            Environment environment) throws DeployerException {
+
+        return AWSAPIUtil.deleteDeployment(apiID, environment);
     }
 
     @Override
