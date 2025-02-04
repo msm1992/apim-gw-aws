@@ -40,8 +40,8 @@ public class AWSAPIUtil {
     private static final Log log = LogFactory.getLog(AWSAPIUtil.class);
 
     private static final String REGION = "eu-north-1";
-    private static final String ACCESS_KEY = "AKIA2MNVLZRSO7M7GI4Y";
-    private static final String SECRET_ACCESS_KEY = "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";
+    private static final String ACCESS_KEY = "***";
+    private static final String SECRET_ACCESS_KEY = "***";
 
 
     public static String importRestAPI (API api, Environment environment) throws DeployerException {
