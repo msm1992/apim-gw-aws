@@ -4,6 +4,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.osgi.service.component.annotations.Component;
 import org.wso2.aws.client.util.AWSAPIUtil;
+import org.wso2.aws.client.util.GatewatUtil;
 import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.api.model.ConfigurationDto;
@@ -15,6 +16,8 @@ import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 
 @Component(
@@ -50,7 +53,8 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
 
     @Override
     public boolean undeployWhenRetire(API api, Environment environment) throws DeployerException {
-        return false;
+
+        return AWSAPIUtil.deleteDeployment(api.getUuid(), environment);
     }
 
     @Override
@@ -74,5 +78,25 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
     @Override
     public String getType() {
         return AWSConstants.AWS_TYPE;
+    }
+
+    @Override
+    public String getGatewayFeatureCatalog() {
+        return AWSConstants.AWS_GATEWAY_FEATURES;
+    }
+
+    @Override
+    public List<String> validateApi(API api) throws DeployerException {
+        List<String> errorList = new ArrayList<>();
+        try {
+            // Endpoint validation
+            errorList.add(GatewatUtil.validateAWSAPIEndpoint(GatewatUtil.getEndpointURL(api)));
+            // Check for wildcard in the resources
+            errorList.add(GatewatUtil.validateResourceContexts(api));
+
+            return errorList.stream().filter(Objects::nonNull).collect(Collectors.toList());
+        } catch (DeployerException e) {
+            throw new DeployerException("Error while validating API with AWS Gateway", e);
+        }
     }
 }

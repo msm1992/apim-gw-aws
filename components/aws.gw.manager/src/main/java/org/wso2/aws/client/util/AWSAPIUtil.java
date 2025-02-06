@@ -40,8 +40,8 @@ public class AWSAPIUtil {
     private static final Log log = LogFactory.getLog(AWSAPIUtil.class);
 
     private static final String REGION = "eu-north-1";
-    private static final String ACCESS_KEY = "***";
-    private static final String SECRET_ACCESS_KEY = "***";
+    private static final String ACCESS_KEY = "";
+    private static final String SECRET_ACCESS_KEY = "";
 
 
     public static String importRestAPI (API api, Environment environment) throws DeployerException {
@@ -209,11 +209,6 @@ public class AWSAPIUtil {
                 }
             }
         } catch (Exception e) {
-            try {
-                GatewatUtil.rollbackDeployment(apiGatewayClient, awsApiId, api.getUuid(), environment.getUuid());
-            } catch (APIManagementException ex) {
-                throw new DeployerException("Error occurred while rolling back deployment: " + ex.getMessage());
-            }
             throw new DeployerException("Error occurred while re-importing API: " + e.getMessage());
         }
     }
