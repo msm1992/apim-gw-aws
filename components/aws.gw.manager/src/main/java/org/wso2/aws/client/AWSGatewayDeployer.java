@@ -4,7 +4,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.osgi.service.component.annotations.Component;
 import org.wso2.aws.client.util.AWSAPIUtil;
-import org.wso2.aws.client.util.GatewatUtil;
+import org.wso2.aws.client.util.GatewayUtil;
 import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.api.model.ConfigurationDto;
@@ -90,9 +90,9 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
         List<String> errorList = new ArrayList<>();
         try {
             // Endpoint validation
-            errorList.add(GatewatUtil.validateAWSAPIEndpoint(GatewatUtil.getEndpointURL(api)));
+            errorList.add(GatewayUtil.validateAWSAPIEndpoint(GatewayUtil.getEndpointURL(api)));
             // Check for wildcard in the resources
-            errorList.add(GatewatUtil.validateResourceContexts(api));
+            errorList.add(GatewayUtil.validateResourceContexts(api));
 
             return errorList.stream().filter(Objects::nonNull).collect(Collectors.toList());
         } catch (DeployerException e) {

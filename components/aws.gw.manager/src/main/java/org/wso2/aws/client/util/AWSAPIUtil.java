@@ -109,14 +109,14 @@ public class AWSAPIUtil {
                 }
             }
 
-            String stageName = GatewatUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
+            String stageName = GatewayUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
 
             CreateDeploymentRequest createDeploymentRequest = CreateDeploymentRequest.builder().restApiId(apiId)
                     .stageName(stageName).build();
             apiGatewayClient.createDeployment(createDeploymentRequest);
         } catch (Exception e) {
             try {
-                GatewatUtil.rollbackDeployment(apiGatewayClient, apiId, api.getUuid(), environment.getUuid());
+                GatewayUtil.rollbackDeployment(apiGatewayClient, apiId, api.getUuid(), environment.getUuid());
             } catch (APIManagementException ex) {
                 throw new DeployerException("Error occurred while rolling back deployment: " + ex.getMessage());
             }
@@ -187,7 +187,7 @@ public class AWSAPIUtil {
                 }
             }
 
-            String stageName = GatewatUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
+            String stageName = GatewayUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
 
             // deploy API
             CreateDeploymentRequest createDeploymentRequest = CreateDeploymentRequest.builder().restApiId(awsApiId)
@@ -222,7 +222,7 @@ public class AWSAPIUtil {
 
             ApiGatewayClient apiGatewayClient = ApiGatewayClientManager
                     .getClient(REGION, ACCESS_KEY, SECRET_ACCESS_KEY);
-            String stageName = GatewatUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
+            String stageName = GatewayUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
 
             // Delete the stage before deleting the deployment
             DeleteStageRequest deleteStageRequest = DeleteStageRequest.builder()
