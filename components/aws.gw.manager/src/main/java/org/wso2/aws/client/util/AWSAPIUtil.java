@@ -13,7 +13,37 @@ import org.wso2.carbon.apimgt.impl.deployer.exceptions.DeployerException;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.apigateway.ApiGatewayClient;
-import software.amazon.awssdk.services.apigateway.model.*;
+import software.amazon.awssdk.services.apigateway.model.AuthorizerType;
+import software.amazon.awssdk.services.apigateway.model.CreateAuthorizerRequest;
+import software.amazon.awssdk.services.apigateway.model.CreateAuthorizerResponse;
+import software.amazon.awssdk.services.apigateway.model.CreateDeploymentRequest;
+import software.amazon.awssdk.services.apigateway.model.CreateDeploymentResponse;
+import software.amazon.awssdk.services.apigateway.model.DeleteDeploymentRequest;
+import software.amazon.awssdk.services.apigateway.model.DeleteStageRequest;
+import software.amazon.awssdk.services.apigateway.model.Deployment;
+import software.amazon.awssdk.services.apigateway.model.GetDeploymentsRequest;
+import software.amazon.awssdk.services.apigateway.model.GetDeploymentsResponse;
+import software.amazon.awssdk.services.apigateway.model.GetResourcesRequest;
+import software.amazon.awssdk.services.apigateway.model.GetResourcesResponse;
+import software.amazon.awssdk.services.apigateway.model.ImportRestApiRequest;
+import software.amazon.awssdk.services.apigateway.model.ImportRestApiResponse;
+import software.amazon.awssdk.services.apigateway.model.IntegrationType;
+import software.amazon.awssdk.services.apigateway.model.Method;
+import software.amazon.awssdk.services.apigateway.model.Op;
+import software.amazon.awssdk.services.apigateway.model.PatchOperation;
+import software.amazon.awssdk.services.apigateway.model.PutIntegrationRequest;
+import software.amazon.awssdk.services.apigateway.model.PutIntegrationResponse;
+import software.amazon.awssdk.services.apigateway.model.PutIntegrationResponseRequest;
+import software.amazon.awssdk.services.apigateway.model.PutMethodRequest;
+import software.amazon.awssdk.services.apigateway.model.PutMethodResponseRequest;
+import software.amazon.awssdk.services.apigateway.model.PutMode;
+import software.amazon.awssdk.services.apigateway.model.PutRestApiRequest;
+import software.amazon.awssdk.services.apigateway.model.PutRestApiResponse;
+import software.amazon.awssdk.services.apigateway.model.Resource;
+import software.amazon.awssdk.services.apigateway.model.UpdateGatewayResponseRequest;
+import software.amazon.awssdk.services.apigateway.model.UpdateIntegrationResponseRequest;
+import software.amazon.awssdk.services.apigateway.model.UpdateMethodRequest;
+import software.amazon.awssdk.services.apigateway.model.UpdateMethodResponseRequest;
 
 import java.util.HashMap;
 import java.util.List;
@@ -116,7 +146,7 @@ public class AWSAPIUtil {
                         apiGatewayClient.updateMethod(updateMethodRequest);
 
                         //configure CORS Headers at request Method level
-                        configureCORSHeadersAtMethodLevel(apiId, resource, apiGatewayClient);
+                        configureCORSHeadersAtMethodLevel(apiId, resource, entry.getKey().toString(), apiGatewayClient);
                     }
                 }
             }

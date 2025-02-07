@@ -25,11 +25,11 @@ public class ApiGatewayClientManager {
     private static ApiGatewayClient createClient(String region, String accessKey, String secretKey) {
         SdkHttpClient httpClient = ApacheHttpClient.builder().build();
         return ApiGatewayClient.builder()
-                    .region(Region.of(region))
-                    .httpClient(httpClient)
-                    .credentialsProvider(StaticCredentialsProvider
-                            .create(AwsBasicCredentials.create(accessKey, secretKey)))
-                    .build();
+                .region(Region.of(region))
+                .httpClient(httpClient)
+                .credentialsProvider(StaticCredentialsProvider
+                        .create(AwsBasicCredentials.create(accessKey, secretKey)))
+                .build();
     }
 }
 
