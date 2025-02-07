@@ -74,6 +74,10 @@
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
+            <artifactId>retries</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
             <artifactId>profiles</artifactId>
         </dependency>
         <dependency>
@@ -124,6 +128,22 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>http-auth</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>lambda</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sdk-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk.crt</groupId>
+            <artifactId>aws-crt</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.eventstream</groupId>
+            <artifactId>eventstream</artifactId>
         </dependency>
     </dependencies>
 

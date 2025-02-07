@@ -29,39 +29,42 @@
                         <Export-Package>
                             org.wso2.aws.client.*;version="${project.version}"
                         </Export-Package>
-                        <Import-Package>
-                            software.amazon.awssdk.awscore; version="0.0.0",
-                            software.amazon.awssdk.utils; version="0.0.0",
-                            software.amazon.awssdk.regions; version="0.0.0",
-                            software.amazon.awssdk.http; version="0.0.0",
-                            software.amazon.awssdk.http.apache; version="0.0.0",
-                            software.amazon.awssdk.services.apigateway; version="0.0.0",
-                            software.amazon.awssdk.core; version="0.0.0",
-                            software.amazon.awssdk.identity.spi; version="0.0.0",
-                            software.amazon.awssdk.retries.api; version="0.0.0",
-                            software.amazon.awssdk.profiles; version="0.0.0",
-                            software.amazon.awssdk.endpoints; version="0.0.0",
+<!--                        <Import-Package>-->
+<!--                            software.amazon.awssdk.awscore; version="0.0.0",-->
+<!--                            software.amazon.awssdk.utils; version="0.0.0",-->
+<!--                            software.amazon.awssdk.regions; version="0.0.0",-->
+<!--                            software.amazon.awssdk.http; version="0.0.0",-->
+<!--                            software.amazon.awssdk.http.apache; version="0.0.0",-->
+<!--                            software.amazon.awssdk.services.apigateway; version="0.0.0",-->
+<!--                            software.amazon.awssdk.core; version="0.0.0",-->
+<!--                            software.amazon.awssdk.identity.spi; version="0.0.0",-->
+<!--                            software.amazon.awssdk.retries.api; version="0.0.0",-->
+<!--                            software.amazon.awssdk.profiles; version="0.0.0",-->
+<!--                            software.amazon.awssdk.endpoints; version="0.0.0",-->
 
-                            software.amazon.awssdk.http.auth.spi.scheme; version="0.0.0",
-                            software.amazon.awssdk.auth.credentials; version="0.0.0",
-                            software.amazon.awssdk.http.auth.aws.scheme; version="0.0.0",
-                            software.amazon.awssdk.http.auth.scheme; version="0.0.0",
-                            software.amazon.awssdk.protocols.json; version="0.0.0",
-                            software.amazon.awssdk.metrics; version="0.0.0",
-                            software.amazon.awssdk.protocols.core; version="0.0.0",
-                            software.amazon.awssdk.protocols.jsoncore; version="0.0.0",
-                            software.amazon.awssdk.thirdparty.jackson.core; version="0.0.0",
-                            software.amazon.awssdk.checksums; version="0.0.0",
-                            software.amazon.awssdk.checksums.spi; version="0.0.0",
-                            *;resolution:=optional
-                        </Import-Package>
+<!--                            software.amazon.awssdk.http.auth.spi.scheme; version="0.0.0",-->
+<!--                            software.amazon.awssdk.auth.credentials; version="0.0.0",-->
+<!--                            software.amazon.awssdk.http.auth.aws.scheme; version="0.0.0",-->
+<!--                            software.amazon.awssdk.http.auth.scheme; version="0.0.0",-->
+<!--                            software.amazon.awssdk.protocols.json; version="0.0.0",-->
+<!--                            software.amazon.awssdk.metrics; version="0.0.0",-->
+<!--                            software.amazon.awssdk.protocols.core; version="0.0.0",-->
+<!--                            software.amazon.awssdk.protocols.jsoncore; version="0.0.0",-->
+<!--                            software.amazon.awssdk.thirdparty.jackson.core; version="0.0.0",-->
+<!--                            software.amazon.awssdk.checksums; version="0.0.0",-->
+<!--                            software.amazon.awssdk.checksums.spi; version="0.0.0",-->
+<!--                            software.amazon.awssdk.services.lambda; version="0.0.0",-->
+<!--                            *;resolution:=optional-->
+<!--                        </Import-Package>-->
                         <DynamicImport-Package>*</DynamicImport-Package>
-<!--                        <Embed-Dependency>-->
-<!--                            aws-core,utils,regions,apache-client,apigateway,identity-spi,-->
-<!--                            retries-spi,profiles,endpoints-spi,http-auth-spi,auth,http-auth-aws,-->
-<!--                            aws-json-protocol,metrics-spi,protocol-core,json-utils,third-party-jackson-core,-->
-<!--                            checksums,checksums-spi,http-auth-->
-<!--                        </Embed-Dependency>-->
+                        <Embed-Dependency>
+                            aws-core,utils,regions,apache-client,apigateway,identity-spi,
+                            retries-spi,profiles,endpoints-spi,http-auth-spi,auth,http-auth-aws,
+                            aws-json-protocol,metrics-spi,protocol-core,json-utils,third-party-jackson-core,
+                            checksums,checksums-spi,http-auth,lambda,http-client-spi,metrics-spi,retries,sdk-core,
+                            aws-crt,eventstream
+                        </Embed-Dependency>
+                        <Embed-Transitive>true</Embed-Transitive>
                     </instructions>
                 </configuration>
             </plugin>
@@ -146,6 +149,10 @@
         </dependency>
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
+            <artifactId>retries</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
             <artifactId>profiles</artifactId>
         </dependency>
         <dependency>
@@ -196,6 +203,22 @@
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>http-auth</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>lambda</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>sdk-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk.crt</groupId>
+            <artifactId>aws-crt</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.eventstream</groupId>
+            <artifactId>eventstream</artifactId>
         </dependency>
     </dependencies>
 

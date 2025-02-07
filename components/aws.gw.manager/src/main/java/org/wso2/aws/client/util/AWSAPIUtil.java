@@ -8,41 +8,19 @@ import org.json.simple.parser.JSONParser;
 import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.api.model.Environment;
+
 import org.wso2.carbon.apimgt.impl.deployer.exceptions.DeployerException;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.apigateway.ApiGatewayClient;
-import software.amazon.awssdk.services.apigateway.model.CreateDeploymentRequest;
-import software.amazon.awssdk.services.apigateway.model.CreateDeploymentResponse;
-import software.amazon.awssdk.services.apigateway.model.DeleteDeploymentRequest;
-import software.amazon.awssdk.services.apigateway.model.DeleteStageRequest;
-import software.amazon.awssdk.services.apigateway.model.Deployment;
-import software.amazon.awssdk.services.apigateway.model.GetDeploymentsRequest;
-import software.amazon.awssdk.services.apigateway.model.GetDeploymentsResponse;
-import software.amazon.awssdk.services.apigateway.model.GetResourcesRequest;
-import software.amazon.awssdk.services.apigateway.model.GetResourcesResponse;
-import software.amazon.awssdk.services.apigateway.model.ImportRestApiRequest;
-import software.amazon.awssdk.services.apigateway.model.ImportRestApiResponse;
-import software.amazon.awssdk.services.apigateway.model.IntegrationType;
-import software.amazon.awssdk.services.apigateway.model.Method;
-import software.amazon.awssdk.services.apigateway.model.PutIntegrationRequest;
-import software.amazon.awssdk.services.apigateway.model.PutIntegrationResponse;
-import software.amazon.awssdk.services.apigateway.model.PutIntegrationResponseRequest;
-import software.amazon.awssdk.services.apigateway.model.PutMode;
-import software.amazon.awssdk.services.apigateway.model.PutRestApiRequest;
-import software.amazon.awssdk.services.apigateway.model.PutRestApiResponse;
-import software.amazon.awssdk.services.apigateway.model.Resource;
+import software.amazon.awssdk.services.apigateway.model.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class AWSAPIUtil {
     private static final Log log = LogFactory.getLog(AWSAPIUtil.class);
-
-    private static final String REGION = "eu-north-1";
-    private static final String ACCESS_KEY = "";
-    private static final String SECRET_ACCESS_KEY = "";
-
 
     public static String importRestAPI (API api, Environment environment) throws DeployerException {
         String openAPI = api.getSwaggerDefinition();
@@ -50,8 +28,11 @@ public class AWSAPIUtil {
         String apiId = null;
 
         try {
-            apiGatewayClient = ApiGatewayClientManager
-                    .getClient(REGION, ACCESS_KEY, SECRET_ACCESS_KEY);
+            String region = environment.getAdditionalProperties().get("region");
+            String accessKey = environment.getAdditionalProperties().get("access_key");
+            String secretAccessKey = environment.getAdditionalProperties().get("secret_key");
+
+            apiGatewayClient = ApiGatewayClientManager.getClient(region, accessKey, secretAccessKey);
 
             ImportRestApiRequest importApiRequest = ImportRestApiRequest.builder()
                     .body(SdkBytes.fromUtf8String(openAPI))
@@ -63,12 +44,28 @@ public class AWSAPIUtil {
             apiId = importApiResponse.id();
 
             //add integrations for each resource
-            GetResourcesRequest getResourcesRequest = GetResourcesRequest.builder()
-                    .restApiId(apiId)
-                    .build();
+            GetResourcesRequest getResourcesRequest = GetResourcesRequest.builder().restApiId(apiId).build();
             GetResourcesResponse getResourcesResponse = apiGatewayClient.getResources(getResourcesRequest);
 
-            //todo: extract endpoint from the API's endpoint configuration
+            //configure authorizer
+            String lambdaArn = environment.getAdditionalProperties().get("oauth2_lambda_arn");
+            List<String> keyManagers = api.getKeyManagers();
+            String authorizerId = "";
+            if (!keyManagers.isEmpty()) {
+                String keyManager = keyManagers.get(0);
+                CreateAuthorizerRequest createAuthorizerRequest = CreateAuthorizerRequest.builder()
+                        .restApiId(apiId)
+                        .name(keyManager + "-authorizer")
+                        .type(AuthorizerType.TOKEN)
+                        .identitySource("method.request.header.Authorization")
+                        .authorizerUri("arn:aws:apigateway:" + region + ":lambda:path/2015-03-31/functions/" + lambdaArn +
+                                "/invocations")
+                        .authorizerCredentials("arn:aws:iam::713881799780:role/LambdaAuthInvokeRole")
+                        .build();
+                CreateAuthorizerResponse createAuthorizerResponse = apiGatewayClient.createAuthorizer(createAuthorizerRequest);
+                authorizerId = createAuthorizerResponse.id();
+            }
+
             String endpointConfig = api.getEndpointConfig();
             JSONParser parser = new JSONParser();
             JSONObject endpointConfigJson = (JSONObject) parser.parse(endpointConfig);
@@ -82,6 +79,9 @@ public class AWSAPIUtil {
             for (Resource resource : resources) {
                 Map<String, Method> resourceMethods = resource.resourceMethods();
                 if (!resourceMethods.isEmpty()) {
+                    //check and configure CORS
+                    configureOptionsCallForCORS(apiId, resource, apiGatewayClient);
+
                     for (Map.Entry entry : resourceMethods.entrySet()) {
                         PutIntegrationRequest putIntegrationRequest = PutIntegrationRequest.builder()
                                 .httpMethod(entry.getKey().toString())
@@ -105,12 +105,23 @@ public class AWSAPIUtil {
                                 .responseTemplates(Map.of("application/json", ""))
                                 .build();
                         apiGatewayClient.putIntegrationResponse(putIntegrationResponseRequest);
+
+                        //configure authorizer
+                        UpdateMethodRequest updateMethodRequest = UpdateMethodRequest.builder().restApiId(apiId)
+                                .resourceId(resource.id()).httpMethod(entry.getKey().toString())
+                                .patchOperations(PatchOperation.builder().op(Op.REPLACE).path("/authorizationType")
+                                        .value("CUSTOM").build(),
+                                        PatchOperation.builder().op(Op.REPLACE).path("/authorizerId")
+                                                .value(authorizerId).build()).build();
+                        apiGatewayClient.updateMethod(updateMethodRequest);
+
+                        //configure CORS Headers at request Method level
+                        configureCORSHeadersAtMethodLevel(apiId, resource, apiGatewayClient);
                     }
                 }
             }
 
-            String stageName = GatewayUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
-
+            String stageName = environment.getAdditionalProperties().get("stage");
             CreateDeploymentRequest createDeploymentRequest = CreateDeploymentRequest.builder().restApiId(apiId)
                     .stageName(stageName).build();
             apiGatewayClient.createDeployment(createDeploymentRequest);
@@ -131,7 +142,10 @@ public class AWSAPIUtil {
         try {
             String openAPI = api.getSwaggerDefinition();
 
-            apiGatewayClient = ApiGatewayClientManager.getClient(REGION, ACCESS_KEY, SECRET_ACCESS_KEY);
+            String region = environment.getAdditionalProperties().get("region");
+            String accessKey = environment.getAdditionalProperties().get("access_key");
+            String secretAccessKey = environment.getAdditionalProperties().get("secret_key");
+            apiGatewayClient = ApiGatewayClientManager.getClient(region, accessKey, secretAccessKey);
             PutRestApiRequest reimportApiRequest = PutRestApiRequest.builder()
                     .restApiId(awsApiId)
                     .body(SdkBytes.fromUtf8String(openAPI))
@@ -142,13 +156,31 @@ public class AWSAPIUtil {
 
             awsApiId = reimportApiResponse.id();
 
+            //configure authorizer
+            String lambdaArn = environment.getAdditionalProperties().get("oauth2_lambda_arn");
+            List<String> keyManagers = api.getKeyManagers();
+            String authorizerId = "";
+            if (!keyManagers.isEmpty()) {
+                String keyManager = keyManagers.get(0);
+                CreateAuthorizerRequest createAuthorizerRequest = CreateAuthorizerRequest.builder()
+                        .restApiId(awsApiId)
+                        .name(keyManager + "-authorizer")
+                        .type(AuthorizerType.TOKEN)
+                        .identitySource("method.request.header.Authorization")
+                        .authorizerUri("arn:aws:apigateway:" + region + ":lambda:path/2015-03-31/functions/" + lambdaArn +
+                                "/invocations")
+                        .authorizerCredentials("arn:aws:iam::713881799780:role/LambdaAuthInvokeRole")
+                        .build();
+                CreateAuthorizerResponse createAuthorizerResponse = apiGatewayClient.createAuthorizer(createAuthorizerRequest);
+                authorizerId = createAuthorizerResponse.id();
+            }
+
             //add integrations for each resource
             GetResourcesRequest getResourcesRequest = GetResourcesRequest.builder()
                     .restApiId(awsApiId)
                     .build();
             GetResourcesResponse getResourcesResponse = apiGatewayClient.getResources(getResourcesRequest);
 
-            //todo: extract endpoint from the API's endpoint configuration
             String endpointConfig = api.getEndpointConfig();
             JSONParser parser = new JSONParser();
             JSONObject endpointConfigJson = (JSONObject) parser.parse(endpointConfig);
@@ -162,6 +194,9 @@ public class AWSAPIUtil {
             for (Resource resource : resources) {
                 Map<String, Method> resourceMethods = resource.resourceMethods();
                 if (!resourceMethods.isEmpty()) {
+                    //check and configure CORS
+                    configureOptionsCallForCORS(awsApiId, resource, apiGatewayClient);
+
                     for (Map.Entry entry : resourceMethods.entrySet()) {
                         PutIntegrationRequest putIntegrationRequest = PutIntegrationRequest.builder()
                                 .httpMethod(entry.getKey().toString())
@@ -183,13 +218,24 @@ public class AWSAPIUtil {
                                         .responseTemplates(Map.of("application/json", ""))
                                         .build();
                         apiGatewayClient.putIntegrationResponse(putIntegrationResponseRequest);
+
+                        UpdateMethodRequest updateMethodRequest = UpdateMethodRequest.builder().restApiId(awsApiId)
+                                .resourceId(resource.id()).httpMethod(entry.getKey().toString())
+                                .patchOperations(PatchOperation.builder().op(Op.REPLACE).path("/authorizationType")
+                                                .value("CUSTOM").build(),
+                                        PatchOperation.builder().op(Op.REPLACE).path("/authorizerId")
+                                                .value(authorizerId).build()).build();
+                        apiGatewayClient.updateMethod(updateMethodRequest);
+
+                        //configure CORS Headers at request Method level
+                        configureCORSHeadersAtMethodLevel(awsApiId, resource, entry.getKey().toString(),
+                                apiGatewayClient);
                     }
                 }
             }
 
-            String stageName = GatewayUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
-
-            // deploy API
+            // re-deploy API
+            String stageName = environment.getAdditionalProperties().get("stage");
             CreateDeploymentRequest createDeploymentRequest = CreateDeploymentRequest.builder().restApiId(awsApiId)
                     .stageName(stageName).build();
             CreateDeploymentResponse createDeploymentResponse =
@@ -220,8 +266,10 @@ public class AWSAPIUtil {
                 throw new DeployerException("API ID is not mapped with AWS API ID");
             }
 
-            ApiGatewayClient apiGatewayClient = ApiGatewayClientManager
-                    .getClient(REGION, ACCESS_KEY, SECRET_ACCESS_KEY);
+            String region = environment.getAdditionalProperties().get("region");
+            String accessKey = environment.getAdditionalProperties().get("access_key");
+            String secretAccessKey = environment.getAdditionalProperties().get("secret_key");
+            ApiGatewayClient apiGatewayClient = ApiGatewayClientManager.getClient(region, accessKey, secretAccessKey);
             String stageName = GatewayUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
 
             // Delete the stage before deleting the deployment
@@ -245,5 +293,82 @@ public class AWSAPIUtil {
         } catch (APIManagementException e) {
             throw new DeployerException("Error occurred while deleting deployment: " + e.getMessage());
         }
+    }
+
+    private static void configureOptionsCallForCORS(String apiId, Resource resource, ApiGatewayClient apiGatewayClient) {
+        //configure CORS
+        PutMethodRequest putMethodRequest = PutMethodRequest.builder().restApiId(apiId)
+                .resourceId(resource.id()).httpMethod("OPTIONS").authorizationType("NONE")
+                .apiKeyRequired(false).build();
+        apiGatewayClient.putMethod(putMethodRequest);
+
+        PutMethodResponseRequest putMethodResponseRequest = PutMethodResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
+                .responseModels(new HashMap<>())
+                .build();
+        apiGatewayClient.putMethodResponse(putMethodResponseRequest);
+
+        PutIntegrationRequest putMethodIntegrationRequest = PutIntegrationRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS")
+                .integrationHttpMethod("OPTIONS").type(IntegrationType.MOCK)
+                .requestTemplates(Map.of("application/json", "{\"statusCode\": 200}"))
+                .build();
+        apiGatewayClient.putIntegration(putMethodIntegrationRequest);
+
+        PutIntegrationResponseRequest putIntegrationResponseRequest = PutIntegrationResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
+                .responseTemplates(Map.of("application/json", ""))
+                .build();
+        apiGatewayClient.putIntegrationResponse(putIntegrationResponseRequest);
+
+        UpdateMethodResponseRequest updateMethodResponseRequest = UpdateMethodResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
+                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
+                                ".response.header.Access-Control-Allow-Origin").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
+                                ".header.Access-Control-Allow-Methods").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
+                                ".header.Access-Control-Allow-Headers").build()).build();
+        apiGatewayClient.updateMethodResponse(updateMethodResponseRequest);
+
+        UpdateIntegrationResponseRequest updateIntegrationResponseRequest = UpdateIntegrationResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
+                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
+                                ".response.header.Access-Control-Allow-Origin").value("'*'").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
+                                ".header.Access-Control-Allow-Methods").value("'GET,OPTIONS'").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
+                                        ".header.Access-Control-Allow-Headers")
+                                .value("'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'").build())
+                .build();
+        apiGatewayClient.updateIntegrationResponse(updateIntegrationResponseRequest);
+
+        UpdateGatewayResponseRequest updateGatewayResponseRequest = UpdateGatewayResponseRequest.builder()
+                .restApiId(apiId).responseType("DEFAULT_4XX")
+                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/" +
+                                "gatewayresponse.header.Access-Control-Allow-Origin").value("'*'").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/gatewayresponse." +
+                                "header.Access-Control-Allow-Methods").value("'GET,OPTIONS'").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/gatewayresponse." +
+                                        "header.Access-Control-Allow-Headers")
+                                .value("'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'").build())
+                .build();
+        apiGatewayClient.updateGatewayResponse(updateGatewayResponseRequest);
+    }
+
+    private static void configureCORSHeadersAtMethodLevel(String apiId, Resource resource, String httpMethod,
+                                                          ApiGatewayClient apiGatewayClient) {
+        UpdateMethodResponseRequest updateMethodResponseRequest = UpdateMethodResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod(httpMethod).statusCode("200")
+                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
+                        ".response.header.Access-Control-Allow-Origin").build()).build();
+        apiGatewayClient.updateMethodResponse(updateMethodResponseRequest);
+
+        UpdateIntegrationResponseRequest updateIntegrationResponseRequest =
+                UpdateIntegrationResponseRequest.builder()
+                        .restApiId(apiId).resourceId(resource.id()).httpMethod(httpMethod).statusCode("200")
+                        .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
+                                ".response.header.Access-Control-Allow-Origin").value("'*'").build()).build();
+        apiGatewayClient.updateIntegrationResponse(updateIntegrationResponseRequest);
     }
 }
