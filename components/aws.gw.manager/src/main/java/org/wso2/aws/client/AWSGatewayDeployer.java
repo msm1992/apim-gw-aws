@@ -104,7 +104,7 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
     }
 
     @Override
-    public String getResolvedAPIInvocationUrl(String apiId, String url, Environment environment) throws DeployerException {
+    public String getAPIExecutionURL(String apiId, String url, Environment environment) throws DeployerException {
         StringBuilder resolvedUrl = new StringBuilder(url);
         try {
             String awsAPIId = APIUtil.getApiAWSApiMappingByApiId(apiId, environment.getUuid());
@@ -124,6 +124,6 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
         } catch (APIManagementException e) {
             throw new DeployerException("Error while getting resolved API invocation URL", e);
         }
-        return resolvedUrl.toString();
+        return resolvedUrl.toString() + "/" + environment.getAdditionalProperties().get("stage");
     }
 }

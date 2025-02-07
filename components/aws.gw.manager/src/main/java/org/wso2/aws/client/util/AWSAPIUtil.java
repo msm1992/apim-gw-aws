@@ -110,7 +110,7 @@ public class AWSAPIUtil {
                 Map<String, Method> resourceMethods = resource.resourceMethods();
                 if (!resourceMethods.isEmpty()) {
                     //check and configure CORS
-                    configureOptionsCallForCORS(apiId, resource, apiGatewayClient);
+                    GatewayUtil.configureOptionsCallForCORS(apiId, resource, apiGatewayClient);
 
                     for (Map.Entry entry : resourceMethods.entrySet()) {
                         PutIntegrationRequest putIntegrationRequest = PutIntegrationRequest.builder()
@@ -146,7 +146,8 @@ public class AWSAPIUtil {
                         apiGatewayClient.updateMethod(updateMethodRequest);
 
                         //configure CORS Headers at request Method level
-                        configureCORSHeadersAtMethodLevel(apiId, resource, entry.getKey().toString(), apiGatewayClient);
+                        GatewayUtil.configureCORSHeadersAtMethodLevel(apiId, resource, entry.getKey().toString(),
+                                apiGatewayClient);
                     }
                 }
             }
@@ -225,7 +226,7 @@ public class AWSAPIUtil {
                 Map<String, Method> resourceMethods = resource.resourceMethods();
                 if (!resourceMethods.isEmpty()) {
                     //check and configure CORS
-                    configureOptionsCallForCORS(awsApiId, resource, apiGatewayClient);
+                    GatewayUtil.configureOptionsCallForCORS(awsApiId, resource, apiGatewayClient);
 
                     for (Map.Entry entry : resourceMethods.entrySet()) {
                         PutIntegrationRequest putIntegrationRequest = PutIntegrationRequest.builder()
@@ -258,7 +259,7 @@ public class AWSAPIUtil {
                         apiGatewayClient.updateMethod(updateMethodRequest);
 
                         //configure CORS Headers at request Method level
-                        configureCORSHeadersAtMethodLevel(awsApiId, resource, entry.getKey().toString(),
+                        GatewayUtil.configureCORSHeadersAtMethodLevel(awsApiId, resource, entry.getKey().toString(),
                                 apiGatewayClient);
                     }
                 }
@@ -323,82 +324,5 @@ public class AWSAPIUtil {
         } catch (APIManagementException e) {
             throw new DeployerException("Error occurred while deleting deployment: " + e.getMessage());
         }
-    }
-
-    private static void configureOptionsCallForCORS(String apiId, Resource resource, ApiGatewayClient apiGatewayClient) {
-        //configure CORS
-        PutMethodRequest putMethodRequest = PutMethodRequest.builder().restApiId(apiId)
-                .resourceId(resource.id()).httpMethod("OPTIONS").authorizationType("NONE")
-                .apiKeyRequired(false).build();
-        apiGatewayClient.putMethod(putMethodRequest);
-
-        PutMethodResponseRequest putMethodResponseRequest = PutMethodResponseRequest.builder()
-                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
-                .responseModels(new HashMap<>())
-                .build();
-        apiGatewayClient.putMethodResponse(putMethodResponseRequest);
-
-        PutIntegrationRequest putMethodIntegrationRequest = PutIntegrationRequest.builder()
-                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS")
-                .integrationHttpMethod("OPTIONS").type(IntegrationType.MOCK)
-                .requestTemplates(Map.of("application/json", "{\"statusCode\": 200}"))
-                .build();
-        apiGatewayClient.putIntegration(putMethodIntegrationRequest);
-
-        PutIntegrationResponseRequest putIntegrationResponseRequest = PutIntegrationResponseRequest.builder()
-                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
-                .responseTemplates(Map.of("application/json", ""))
-                .build();
-        apiGatewayClient.putIntegrationResponse(putIntegrationResponseRequest);
-
-        UpdateMethodResponseRequest updateMethodResponseRequest = UpdateMethodResponseRequest.builder()
-                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
-                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
-                                ".response.header.Access-Control-Allow-Origin").build(),
-                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
-                                ".header.Access-Control-Allow-Methods").build(),
-                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
-                                ".header.Access-Control-Allow-Headers").build()).build();
-        apiGatewayClient.updateMethodResponse(updateMethodResponseRequest);
-
-        UpdateIntegrationResponseRequest updateIntegrationResponseRequest = UpdateIntegrationResponseRequest.builder()
-                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
-                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
-                                ".response.header.Access-Control-Allow-Origin").value("'*'").build(),
-                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
-                                ".header.Access-Control-Allow-Methods").value("'GET,OPTIONS'").build(),
-                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
-                                        ".header.Access-Control-Allow-Headers")
-                                .value("'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'").build())
-                .build();
-        apiGatewayClient.updateIntegrationResponse(updateIntegrationResponseRequest);
-
-        UpdateGatewayResponseRequest updateGatewayResponseRequest = UpdateGatewayResponseRequest.builder()
-                .restApiId(apiId).responseType("DEFAULT_4XX")
-                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/" +
-                                "gatewayresponse.header.Access-Control-Allow-Origin").value("'*'").build(),
-                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/gatewayresponse." +
-                                "header.Access-Control-Allow-Methods").value("'GET,OPTIONS'").build(),
-                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/gatewayresponse." +
-                                        "header.Access-Control-Allow-Headers")
-                                .value("'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'").build())
-                .build();
-        apiGatewayClient.updateGatewayResponse(updateGatewayResponseRequest);
-    }
-
-    private static void configureCORSHeadersAtMethodLevel(String apiId, Resource resource, String httpMethod,
-                                                          ApiGatewayClient apiGatewayClient) {
-        UpdateMethodResponseRequest updateMethodResponseRequest = UpdateMethodResponseRequest.builder()
-                .restApiId(apiId).resourceId(resource.id()).httpMethod(httpMethod).statusCode("200")
-                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
-                        ".response.header.Access-Control-Allow-Origin").build()).build();
-        apiGatewayClient.updateMethodResponse(updateMethodResponseRequest);
-
-        UpdateIntegrationResponseRequest updateIntegrationResponseRequest =
-                UpdateIntegrationResponseRequest.builder()
-                        .restApiId(apiId).resourceId(resource.id()).httpMethod(httpMethod).statusCode("200")
-                        .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
-                                ".response.header.Access-Control-Allow-Origin").value("'*'").build()).build();
-        apiGatewayClient.updateIntegrationResponse(updateIntegrationResponseRequest);
     }
 }
