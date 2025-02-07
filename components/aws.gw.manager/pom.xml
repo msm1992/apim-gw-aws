@@ -29,33 +29,6 @@
                         <Export-Package>
                             org.wso2.aws.client.*;version="${project.version}"
                         </Export-Package>
-<!--                        <Import-Package>-->
-<!--                            software.amazon.awssdk.awscore; version="0.0.0",-->
-<!--                            software.amazon.awssdk.utils; version="0.0.0",-->
-<!--                            software.amazon.awssdk.regions; version="0.0.0",-->
-<!--                            software.amazon.awssdk.http; version="0.0.0",-->
-<!--                            software.amazon.awssdk.http.apache; version="0.0.0",-->
-<!--                            software.amazon.awssdk.services.apigateway; version="0.0.0",-->
-<!--                            software.amazon.awssdk.core; version="0.0.0",-->
-<!--                            software.amazon.awssdk.identity.spi; version="0.0.0",-->
-<!--                            software.amazon.awssdk.retries.api; version="0.0.0",-->
-<!--                            software.amazon.awssdk.profiles; version="0.0.0",-->
-<!--                            software.amazon.awssdk.endpoints; version="0.0.0",-->
-
-<!--                            software.amazon.awssdk.http.auth.spi.scheme; version="0.0.0",-->
-<!--                            software.amazon.awssdk.auth.credentials; version="0.0.0",-->
-<!--                            software.amazon.awssdk.http.auth.aws.scheme; version="0.0.0",-->
-<!--                            software.amazon.awssdk.http.auth.scheme; version="0.0.0",-->
-<!--                            software.amazon.awssdk.protocols.json; version="0.0.0",-->
-<!--                            software.amazon.awssdk.metrics; version="0.0.0",-->
-<!--                            software.amazon.awssdk.protocols.core; version="0.0.0",-->
-<!--                            software.amazon.awssdk.protocols.jsoncore; version="0.0.0",-->
-<!--                            software.amazon.awssdk.thirdparty.jackson.core; version="0.0.0",-->
-<!--                            software.amazon.awssdk.checksums; version="0.0.0",-->
-<!--                            software.amazon.awssdk.checksums.spi; version="0.0.0",-->
-<!--                            software.amazon.awssdk.services.lambda; version="0.0.0",-->
-<!--                            *;resolution:=optional-->
-<!--                        </Import-Package>-->
                         <DynamicImport-Package>*</DynamicImport-Package>
                         <Embed-Dependency>
                             aws-core,utils,regions,apache-client,apigateway,identity-spi,
@@ -135,10 +108,6 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>apigateway</artifactId>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>software.amazon.awssdk</groupId>-->
-<!--            <artifactId>core</artifactId>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>identity-spi</artifactId>
