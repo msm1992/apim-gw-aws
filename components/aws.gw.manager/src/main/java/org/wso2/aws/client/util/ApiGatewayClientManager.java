@@ -6,6 +6,7 @@ import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.apache.ApacheHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.apigateway.ApiGatewayClient;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,7 +24,6 @@ public class ApiGatewayClientManager {
 
     private static ApiGatewayClient createClient(String region, String accessKey, String secretKey) {
         SdkHttpClient httpClient = ApacheHttpClient.builder().build();
-
         return ApiGatewayClient.builder()
                 .region(Region.of(region))
                 .httpClient(httpClient)

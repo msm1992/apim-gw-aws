@@ -69,9 +69,12 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
         configurationDtoList
                 .add(new ConfigurationDto("region", "AWS Region", "input", "AWS Region", "", true, false, Collections.emptyList(), false));
         configurationDtoList
-                .add(new ConfigurationDto("service_name", "AWS Service Name", "input", "AWS Service Name", "", true, false, Collections.emptyList(), false));
-        configurationDtoList
-                .add(new ConfigurationDto("api_url", "Management API URL", "input", "Management API URL", "", true, false, Collections.emptyList(), false));
+                .add(new ConfigurationDto("oauth2_lambda_arn", "OAuth2 Lambda ARN", "input", "Lambda function to " +
+                        "support OAuth2", "", true, false, Collections.emptyList(), false));
+        configurationDtoList.add(new ConfigurationDto("stage", "Stage Name", "input", "Default stage name", "", true,
+                false,
+                Collections.emptyList(), false));
+
         return configurationDtoList;
     }
 
@@ -98,5 +101,29 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
         } catch (DeployerException e) {
             throw new DeployerException("Error while validating API with AWS Gateway", e);
         }
+    }
+
+    @Override
+    public String getAPIExecutionURL(String apiId, String url, Environment environment) throws DeployerException {
+        StringBuilder resolvedUrl = new StringBuilder(url);
+        try {
+            String awsAPIId = APIUtil.getApiAWSApiMappingByApiId(apiId, environment.getUuid());
+
+            //replace {apiId} placeHolder with actual API ID
+            int start = resolvedUrl.indexOf("{apiId}");
+            if (start != -1) {
+                resolvedUrl.replace(start, start + "{apiId}".length(), awsAPIId);
+            }
+
+            //replace {region} placeHolder with actual region
+            String region = environment.getAdditionalProperties().get("region");
+            start = resolvedUrl.indexOf("{region}");
+            if (start != -1) {
+                resolvedUrl.replace(start, start + "{region}".length(), region);
+            }
+        } catch (APIManagementException e) {
+            throw new DeployerException("Error while getting resolved API invocation URL", e);
+        }
+        return resolvedUrl.toString() + "/" + environment.getAdditionalProperties().get("stage");
     }
 }

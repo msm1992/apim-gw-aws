@@ -12,10 +12,11 @@ import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.impl.deployer.exceptions.DeployerException;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import software.amazon.awssdk.services.apigateway.ApiGatewayClient;
-import software.amazon.awssdk.services.apigateway.model.DeleteRestApiRequest;
+import software.amazon.awssdk.services.apigateway.model.*;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -109,5 +110,82 @@ public class GatewayUtil {
             return "Some resource contexts contain '*' wildcard";
         }
         return null;
+    }
+
+    public static void configureOptionsCallForCORS(String apiId, Resource resource, ApiGatewayClient apiGatewayClient) {
+        //configure CORS
+        PutMethodRequest putMethodRequest = PutMethodRequest.builder().restApiId(apiId)
+                .resourceId(resource.id()).httpMethod("OPTIONS").authorizationType("NONE")
+                .apiKeyRequired(false).build();
+        apiGatewayClient.putMethod(putMethodRequest);
+
+        PutMethodResponseRequest putMethodResponseRequest = PutMethodResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
+                .responseModels(new HashMap<>())
+                .build();
+        apiGatewayClient.putMethodResponse(putMethodResponseRequest);
+
+        PutIntegrationRequest putMethodIntegrationRequest = PutIntegrationRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS")
+                .integrationHttpMethod("OPTIONS").type(IntegrationType.MOCK)
+                .requestTemplates(Map.of("application/json", "{\"statusCode\": 200}"))
+                .build();
+        apiGatewayClient.putIntegration(putMethodIntegrationRequest);
+
+        PutIntegrationResponseRequest putIntegrationResponseRequest = PutIntegrationResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
+                .responseTemplates(Map.of("application/json", ""))
+                .build();
+        apiGatewayClient.putIntegrationResponse(putIntegrationResponseRequest);
+
+        UpdateMethodResponseRequest updateMethodResponseRequest = UpdateMethodResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
+                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
+                                ".response.header.Access-Control-Allow-Origin").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
+                                ".header.Access-Control-Allow-Methods").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
+                                ".header.Access-Control-Allow-Headers").build()).build();
+        apiGatewayClient.updateMethodResponse(updateMethodResponseRequest);
+
+        UpdateIntegrationResponseRequest updateIntegrationResponseRequest = UpdateIntegrationResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod("OPTIONS").statusCode("200")
+                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
+                                ".response.header.Access-Control-Allow-Origin").value("'*'").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
+                                ".header.Access-Control-Allow-Methods").value("'GET,OPTIONS'").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/method.response" +
+                                        ".header.Access-Control-Allow-Headers")
+                                .value("'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'").build())
+                .build();
+        apiGatewayClient.updateIntegrationResponse(updateIntegrationResponseRequest);
+
+        UpdateGatewayResponseRequest updateGatewayResponseRequest = UpdateGatewayResponseRequest.builder()
+                .restApiId(apiId).responseType("DEFAULT_4XX")
+                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/" +
+                                "gatewayresponse.header.Access-Control-Allow-Origin").value("'*'").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/gatewayresponse." +
+                                "header.Access-Control-Allow-Methods").value("'GET,OPTIONS'").build(),
+                        PatchOperation.builder().op(Op.ADD).path("/responseParameters/gatewayresponse." +
+                                        "header.Access-Control-Allow-Headers")
+                                .value("'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'").build())
+                .build();
+        apiGatewayClient.updateGatewayResponse(updateGatewayResponseRequest);
+    }
+
+    public static void configureCORSHeadersAtMethodLevel(String apiId, Resource resource, String httpMethod,
+                                                          ApiGatewayClient apiGatewayClient) {
+        UpdateMethodResponseRequest updateMethodResponseRequest = UpdateMethodResponseRequest.builder()
+                .restApiId(apiId).resourceId(resource.id()).httpMethod(httpMethod).statusCode("200")
+                .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
+                        ".response.header.Access-Control-Allow-Origin").build()).build();
+        apiGatewayClient.updateMethodResponse(updateMethodResponseRequest);
+
+        UpdateIntegrationResponseRequest updateIntegrationResponseRequest =
+                UpdateIntegrationResponseRequest.builder()
+                        .restApiId(apiId).resourceId(resource.id()).httpMethod(httpMethod).statusCode("200")
+                        .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
+                                ".response.header.Access-Control-Allow-Origin").value("'*'").build()).build();
+        apiGatewayClient.updateIntegrationResponse(updateIntegrationResponseRequest);
     }
 }
