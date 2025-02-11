@@ -9,22 +9,24 @@ import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.api.model.Environment;
 
+import org.wso2.carbon.apimgt.api.model.OperationPolicy;
+import org.wso2.carbon.apimgt.api.model.URITemplate;
 import org.wso2.carbon.apimgt.impl.deployer.exceptions.DeployerException;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.apigateway.ApiGatewayClient;
-import software.amazon.awssdk.services.apigateway.model.AuthorizerType;
-import software.amazon.awssdk.services.apigateway.model.CreateAuthorizerRequest;
-import software.amazon.awssdk.services.apigateway.model.CreateAuthorizerResponse;
+import software.amazon.awssdk.services.apigateway.model.Authorizer;
 import software.amazon.awssdk.services.apigateway.model.CreateDeploymentRequest;
 import software.amazon.awssdk.services.apigateway.model.CreateDeploymentResponse;
 import software.amazon.awssdk.services.apigateway.model.DeleteDeploymentRequest;
 import software.amazon.awssdk.services.apigateway.model.DeleteStageRequest;
 import software.amazon.awssdk.services.apigateway.model.Deployment;
+import software.amazon.awssdk.services.apigateway.model.GetAuthorizersRequest;
 import software.amazon.awssdk.services.apigateway.model.GetDeploymentsRequest;
 import software.amazon.awssdk.services.apigateway.model.GetDeploymentsResponse;
 import software.amazon.awssdk.services.apigateway.model.GetResourcesRequest;
 import software.amazon.awssdk.services.apigateway.model.GetResourcesResponse;
+import software.amazon.awssdk.services.apigateway.model.GetRestApiRequest;
 import software.amazon.awssdk.services.apigateway.model.ImportRestApiRequest;
 import software.amazon.awssdk.services.apigateway.model.ImportRestApiResponse;
 import software.amazon.awssdk.services.apigateway.model.IntegrationType;
@@ -34,28 +36,30 @@ import software.amazon.awssdk.services.apigateway.model.PatchOperation;
 import software.amazon.awssdk.services.apigateway.model.PutIntegrationRequest;
 import software.amazon.awssdk.services.apigateway.model.PutIntegrationResponse;
 import software.amazon.awssdk.services.apigateway.model.PutIntegrationResponseRequest;
-import software.amazon.awssdk.services.apigateway.model.PutMethodRequest;
-import software.amazon.awssdk.services.apigateway.model.PutMethodResponseRequest;
 import software.amazon.awssdk.services.apigateway.model.PutMode;
 import software.amazon.awssdk.services.apigateway.model.PutRestApiRequest;
 import software.amazon.awssdk.services.apigateway.model.PutRestApiResponse;
 import software.amazon.awssdk.services.apigateway.model.Resource;
-import software.amazon.awssdk.services.apigateway.model.UpdateGatewayResponseRequest;
-import software.amazon.awssdk.services.apigateway.model.UpdateIntegrationResponseRequest;
 import software.amazon.awssdk.services.apigateway.model.UpdateMethodRequest;
-import software.amazon.awssdk.services.apigateway.model.UpdateMethodResponseRequest;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class AWSAPIUtil {
     private static final Log log = LogFactory.getLog(AWSAPIUtil.class);
 
     public static String importRestAPI (API api, Environment environment) throws DeployerException {
+
         String openAPI = api.getSwaggerDefinition();
         ApiGatewayClient apiGatewayClient = null;
         String apiId = null;
+        Map<String, String> authorizers = new HashMap<>();
+        Map<String, String> pathToArnMapping = new HashMap<>();
 
         try {
             String region = environment.getAdditionalProperties().get("region");
@@ -77,23 +81,42 @@ public class AWSAPIUtil {
             GetResourcesRequest getResourcesRequest = GetResourcesRequest.builder().restApiId(apiId).build();
             GetResourcesResponse getResourcesResponse = apiGatewayClient.getResources(getResourcesRequest);
 
-            //configure authorizer
-            String lambdaArn = environment.getAdditionalProperties().get("oauth2_lambda_arn");
-            List<String> keyManagers = api.getKeyManagers();
-            String authorizerId = "";
-            if (!keyManagers.isEmpty()) {
-                String keyManager = keyManagers.get(0);
-                CreateAuthorizerRequest createAuthorizerRequest = CreateAuthorizerRequest.builder()
-                        .restApiId(apiId)
-                        .name(keyManager + "-authorizer")
-                        .type(AuthorizerType.TOKEN)
-                        .identitySource("method.request.header.Authorization")
-                        .authorizerUri("arn:aws:apigateway:" + region + ":lambda:path/2015-03-31/functions/" + lambdaArn +
-                                "/invocations")
-                        .authorizerCredentials("arn:aws:iam::713881799780:role/LambdaAuthInvokeRole")
-                        .build();
-                CreateAuthorizerResponse createAuthorizerResponse = apiGatewayClient.createAuthorizer(createAuthorizerRequest);
-                authorizerId = createAuthorizerResponse.id();
+            //configure authorizers
+            String lambdaArnAPI = null;
+            List<OperationPolicy> apiPolicies = api.getApiPolicies();
+            if (apiPolicies != null) {
+                for (OperationPolicy policy : apiPolicies) {
+                    if (policy.getPolicyName().equals("awsOAuth2")) {
+                        lambdaArnAPI = policy.getParameters().get("lambdaARN").toString();
+                        break;
+                    }
+                }
+            }
+            if (lambdaArnAPI != null) {
+                pathToArnMapping.put("API", lambdaArnAPI);
+                authorizers.put(lambdaArnAPI ,GatewayUtil.getAuthorizer(apiId,
+                        lambdaArnAPI.substring(lambdaArnAPI.lastIndexOf(':') + 1),
+                        lambdaArnAPI, region,
+                        apiGatewayClient).id());
+            }
+
+            for (URITemplate resource: api.getUriTemplates()) {
+                String resourceLambdaARN = null;
+                for (OperationPolicy policy: resource.getOperationPolicies()) {
+                    if (policy.getPolicyName().equals("awsOAuth2")) {
+                        resourceLambdaARN = policy.getParameters().get("lambdaARN").toString();
+                        break;
+                    }
+                }
+
+                if (resourceLambdaARN != null && !authorizers.containsKey(resourceLambdaARN)) {
+                    pathToArnMapping.put(resource.getUriTemplate().toLowerCase()
+                                    + "|" + resource.getHTTPVerb().toLowerCase(), resourceLambdaARN);
+                    authorizers.put(resourceLambdaARN, GatewayUtil.getAuthorizer(apiId,
+                            resourceLambdaARN.substring(resourceLambdaARN.lastIndexOf(':') + 1),
+                            resourceLambdaARN, region,
+                            apiGatewayClient).id());
+                }
             }
 
             String endpointConfig = api.getEndpointConfig();
@@ -136,6 +159,16 @@ public class AWSAPIUtil {
                                 .build();
                         apiGatewayClient.putIntegrationResponse(putIntegrationResponseRequest);
 
+                        String key = resource.path().toLowerCase() + "|" + entry.getKey().toString().toLowerCase();
+                        if (!authorizers.containsKey(pathToArnMapping.get(key))) {
+                            key = "API";
+                            if (!authorizers.containsKey(pathToArnMapping.get(key))) {
+                                throw new DeployerException("Authorizer not found for the resource: "
+                                        + resource.path());
+                            }
+                        }
+                        String authorizerId = authorizers.get(pathToArnMapping.get(key));
+
                         //configure authorizer
                         UpdateMethodRequest updateMethodRequest = UpdateMethodRequest.builder().restApiId(apiId)
                                 .resourceId(resource.id()).httpMethod(entry.getKey().toString())
@@ -164,12 +197,19 @@ public class AWSAPIUtil {
             }
             throw new DeployerException("Error occurred while importing API: " + e.getMessage());
         }
-        return apiId;
+
+        GetRestApiRequest getRestApiRequest = GetRestApiRequest.builder().restApiId(apiId).build();
+
+        return apiGatewayClient.getRestApi(getRestApiRequest).toString();
     }
 
-    public static void reimportRestAPI(String awsApiId, API api, Environment environment) throws DeployerException {
-
+    public static String reimportRestAPI(String referenceArtifact, API api, Environment environment)
+            throws DeployerException {
+        String awsApiId = GatewayUtil.getAWSApiIdFromReferenceArtifact(referenceArtifact);
         ApiGatewayClient apiGatewayClient = null;
+        List<String> currentARNs = new ArrayList<>();
+        Map<String, String> authorizers = new HashMap<>();
+        Map<String, String> pathToArnMapping = new HashMap<>();
         try {
             String openAPI = api.getSwaggerDefinition();
 
@@ -187,23 +227,71 @@ public class AWSAPIUtil {
 
             awsApiId = reimportApiResponse.id();
 
-            //configure authorizer
-            String lambdaArn = environment.getAdditionalProperties().get("oauth2_lambda_arn");
-            List<String> keyManagers = api.getKeyManagers();
-            String authorizerId = "";
-            if (!keyManagers.isEmpty()) {
-                String keyManager = keyManagers.get(0);
-                CreateAuthorizerRequest createAuthorizerRequest = CreateAuthorizerRequest.builder()
-                        .restApiId(awsApiId)
-                        .name(keyManager + "-authorizer")
-                        .type(AuthorizerType.TOKEN)
-                        .identitySource("method.request.header.Authorization")
-                        .authorizerUri("arn:aws:apigateway:" + region + ":lambda:path/2015-03-31/functions/" + lambdaArn +
-                                "/invocations")
-                        .authorizerCredentials("arn:aws:iam::713881799780:role/LambdaAuthInvokeRole")
-                        .build();
-                CreateAuthorizerResponse createAuthorizerResponse = apiGatewayClient.createAuthorizer(createAuthorizerRequest);
-                authorizerId = createAuthorizerResponse.id();
+            //configure authorizers
+            GetAuthorizersRequest getAuthorizersRequest = GetAuthorizersRequest.builder().restApiId(awsApiId).build();
+            List<Authorizer> existingAuthorizers = apiGatewayClient.getAuthorizers(getAuthorizersRequest).items();
+
+            for (Authorizer authorizer : existingAuthorizers) {
+                String regex = "arn:aws:apigateway:[^:]+:lambda:path/2015-03-31/functions/([^/]+)/invocations";
+                Pattern compiledPattern = Pattern.compile(regex);
+                Matcher matcher = compiledPattern.matcher(authorizer.authorizerUri());
+                String arn = null;
+                if (matcher.find()) {
+                    arn = matcher.group(1);
+                }
+                authorizers.put(arn, authorizer.id());
+                currentARNs.add(arn);
+            }
+
+            String lambdaArnAPI = null;
+            List<OperationPolicy> apiPolicies = api.getApiPolicies();
+            if (apiPolicies != null) {
+                for (OperationPolicy policy : apiPolicies) {
+                    if (policy.getPolicyName().equals("awsOAuth2")) {
+                        lambdaArnAPI = policy.getParameters().get("lambdaARN").toString();
+                        break;
+                    }
+                }
+            }
+            if (lambdaArnAPI != null && !authorizers.containsKey(lambdaArnAPI)) {
+                pathToArnMapping.put("API", lambdaArnAPI);
+                authorizers.put(lambdaArnAPI ,GatewayUtil.getAuthorizer(awsApiId,
+                        lambdaArnAPI.substring(lambdaArnAPI.lastIndexOf(':') + 1),
+                        lambdaArnAPI, region,
+                        apiGatewayClient).id());
+            }
+
+            Set<URITemplate> uriTemplates = api.getUriTemplates();
+            if (uriTemplates != null) {
+                for (URITemplate resource : uriTemplates) {
+                    String resourceLambdaARN = null;
+                    List<OperationPolicy> resourcePolicies = resource.getOperationPolicies();
+                    if (resourcePolicies != null) {
+                        for (OperationPolicy policy : resourcePolicies) {
+                            if (policy.getPolicyName().equals("awsOAuth2")) {
+                                resourceLambdaARN = policy.getParameters().get("lambdaARN").toString();
+                                break;
+                            }
+                        }
+                    }
+
+                    if (resourceLambdaARN != null && !authorizers.containsKey(resourceLambdaARN)) {
+                        pathToArnMapping.put(resource.getUriTemplate().toLowerCase()
+                                + "|" + resource.getHTTPVerb().toLowerCase(), resourceLambdaARN);
+                        authorizers.put(resourceLambdaARN, GatewayUtil.getAuthorizer(awsApiId,
+                                resourceLambdaARN.substring(resourceLambdaARN.lastIndexOf(':') + 1),
+                                resourceLambdaARN, region,
+                                apiGatewayClient).id());
+                    }
+                }
+            }
+
+            //remove unused authorizers
+            for (String arn : currentARNs) {
+                if (!authorizers.containsKey(arn)) {
+                    GatewayUtil.deleteAuthorizer(awsApiId, authorizers.get(arn), apiGatewayClient);
+                    authorizers.remove(arn);
+                }
             }
 
             //add integrations for each resource
@@ -250,6 +338,16 @@ public class AWSAPIUtil {
                                         .build();
                         apiGatewayClient.putIntegrationResponse(putIntegrationResponseRequest);
 
+                        String key = resource.path().toLowerCase() + "|" + entry.getKey().toString().toLowerCase();
+                        if (!authorizers.containsKey(pathToArnMapping.get(key))) {
+                            key = "API";
+                            if (!authorizers.containsKey(pathToArnMapping.get(key))) {
+                                throw new DeployerException("Authorizer not found for the resource: "
+                                        + resource.path());
+                            }
+                        }
+                        String authorizerId = authorizers.get(pathToArnMapping.get(key));
+
                         UpdateMethodRequest updateMethodRequest = UpdateMethodRequest.builder().restApiId(awsApiId)
                                 .resourceId(resource.id()).httpMethod(entry.getKey().toString())
                                 .patchOperations(PatchOperation.builder().op(Op.REPLACE).path("/authorizationType")
@@ -285,6 +383,9 @@ public class AWSAPIUtil {
                     apiGatewayClient.deleteDeployment(deleteDeploymentRequest);
                 }
             }
+
+            GetRestApiRequest getRestApiRequest = GetRestApiRequest.builder().restApiId(awsApiId).build();
+            return apiGatewayClient.getRestApi(getRestApiRequest).toString();
         } catch (Exception e) {
             throw new DeployerException("Error occurred while re-importing API: " + e.getMessage());
         }
@@ -292,16 +393,17 @@ public class AWSAPIUtil {
 
     public static boolean deleteDeployment(String apiId, Environment environment) throws DeployerException {
         try {
-            String awsApiId = APIUtil.getApiAWSApiMappingByApiId(apiId, environment.getUuid());
-            if (awsApiId == null) {
+            String referenceArtifact = APIUtil.getApiExternalApiMappingReferenceByApiId(apiId, environment.getUuid());
+            if (referenceArtifact == null) {
                 throw new DeployerException("API ID is not mapped with AWS API ID");
             }
+            String awsApiId = GatewayUtil.getAWSApiIdFromReferenceArtifact(referenceArtifact);
 
             String region = environment.getAdditionalProperties().get("region");
             String accessKey = environment.getAdditionalProperties().get("access_key");
             String secretAccessKey = environment.getAdditionalProperties().get("secret_key");
             ApiGatewayClient apiGatewayClient = ApiGatewayClientManager.getClient(region, accessKey, secretAccessKey);
-            String stageName = GatewayUtil.getStageOfGatewayEnvironment(environment.getGatewayType());
+            String stageName = environment.getAdditionalProperties().get("stage");
 
             // Delete the stage before deleting the deployment
             DeleteStageRequest deleteStageRequest = DeleteStageRequest.builder()

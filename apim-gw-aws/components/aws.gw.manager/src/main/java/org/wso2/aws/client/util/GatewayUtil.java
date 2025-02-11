@@ -7,12 +7,28 @@ import org.apache.commons.lang3.StringUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import org.wso2.aws.client.AWSConstants;
 import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.impl.deployer.exceptions.DeployerException;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import software.amazon.awssdk.services.apigateway.ApiGatewayClient;
-import software.amazon.awssdk.services.apigateway.model.*;
+import software.amazon.awssdk.services.apigateway.model.AuthorizerType;
+import software.amazon.awssdk.services.apigateway.model.CreateAuthorizerRequest;
+import software.amazon.awssdk.services.apigateway.model.CreateAuthorizerResponse;
+import software.amazon.awssdk.services.apigateway.model.DeleteAuthorizerRequest;
+import software.amazon.awssdk.services.apigateway.model.DeleteRestApiRequest;
+import software.amazon.awssdk.services.apigateway.model.IntegrationType;
+import software.amazon.awssdk.services.apigateway.model.Op;
+import software.amazon.awssdk.services.apigateway.model.PatchOperation;
+import software.amazon.awssdk.services.apigateway.model.PutIntegrationRequest;
+import software.amazon.awssdk.services.apigateway.model.PutIntegrationResponseRequest;
+import software.amazon.awssdk.services.apigateway.model.PutMethodRequest;
+import software.amazon.awssdk.services.apigateway.model.PutMethodResponseRequest;
+import software.amazon.awssdk.services.apigateway.model.Resource;
+import software.amazon.awssdk.services.apigateway.model.UpdateGatewayResponseRequest;
+import software.amazon.awssdk.services.apigateway.model.UpdateIntegrationResponseRequest;
+import software.amazon.awssdk.services.apigateway.model.UpdateMethodResponseRequest;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -20,15 +36,22 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class GatewayUtil {
 
     private static final Pattern VALID_PATH_PATTERN = Pattern.compile("^[a-zA-Z0-9-._~%!$&'()*+,;=:@/]*$");
 
-    public static String getStageOfGatewayEnvironment(String gatewayType) {
-        // Get the current stage of the API Gateway from the configs
-        return "dev";
+    public static String getAWSApiIdFromReferenceArtifact(String referenceArtifact) throws DeployerException {
+        Pattern pattern = Pattern.compile(AWSConstants.AWS_ID_PATTERN);
+        Matcher matcher = pattern.matcher(referenceArtifact);
+
+        if (matcher.find()) {
+            return matcher.group(1);
+        } else {
+            throw new DeployerException("Error while extracting AWS API ID from reference artifact");
+        }
     }
 
     public static void rollbackDeployment(ApiGatewayClient apiGatewayClient, String awsApiId, String apiId,
@@ -38,7 +61,7 @@ public class GatewayUtil {
             DeleteRestApiRequest deleteRestApiRequest = DeleteRestApiRequest.builder().restApiId(awsApiId).build();
             apiGatewayClient.deleteRestApi(deleteRestApiRequest);
 
-            APIUtil.deleteApiAWSApiMapping(apiId, environmentId);
+            APIUtil.deleteApiExternalApiMapping(apiId, environmentId);
         }
     }
 
@@ -187,5 +210,29 @@ public class GatewayUtil {
                         .patchOperations(PatchOperation.builder().op(Op.ADD).path("/responseParameters/method" +
                                 ".response.header.Access-Control-Allow-Origin").value("'*'").build()).build();
         apiGatewayClient.updateIntegrationResponse(updateIntegrationResponseRequest);
+    }
+
+    public static CreateAuthorizerResponse getAuthorizer(String awsApiId, String name, String lambdaArn,
+                                                         String region, ApiGatewayClient apiGatewayClient) {
+
+        CreateAuthorizerRequest createAuthorizerRequest = CreateAuthorizerRequest.builder()
+                .restApiId(awsApiId)
+                .name(name + "-authorizer")
+                .type(AuthorizerType.TOKEN)
+                .identitySource("method.request.header.Authorization")
+                .authorizerUri("arn:aws:apigateway:" + region + ":lambda:path/2015-03-31/functions/" + lambdaArn +
+                        "/invocations")
+                .authorizerCredentials("arn:aws:iam::713881799780:role/LambdaAuthInvokeRole")
+                .build();
+        return apiGatewayClient.createAuthorizer(createAuthorizerRequest);
+    }
+
+    public static void deleteAuthorizer(String awsApiId, String authorizerId, ApiGatewayClient apiGatewayClient) {
+        DeleteAuthorizerRequest deleteAuthorizerRequest = DeleteAuthorizerRequest.builder()
+                .restApiId(awsApiId)
+                .authorizerId(authorizerId)
+                .build();
+
+        apiGatewayClient.deleteAuthorizer(deleteAuthorizerRequest);
     }
 }
