@@ -11,6 +11,7 @@ import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.api.model.ConfigurationDto;
 import org.wso2.carbon.apimgt.api.model.Environment;
+import org.wso2.carbon.apimgt.api.model.URITemplate;
 import org.wso2.carbon.apimgt.impl.deployer.ExternalGatewayDeployer;
 import org.wso2.carbon.apimgt.impl.deployer.exceptions.DeployerException;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
@@ -143,5 +144,15 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
             throw new DeployerException("Error while getting resolved API invocation URL", e);
         }
         return resolvedUrl.toString() + "/" + environment.getAdditionalProperties().get("stage");
+    }
+
+    @Override
+    public void applyGatewayStandards(API api) throws DeployerException {
+        // change all /* resources to / in the resources list
+        for(URITemplate resource: api.getUriTemplates()) {
+            if (resource.getUriTemplate().endsWith("/*")) {
+                resource.setUriTemplate(resource.getUriTemplate().replace("/*", "/"));
+            }
+        }
     }
 }
