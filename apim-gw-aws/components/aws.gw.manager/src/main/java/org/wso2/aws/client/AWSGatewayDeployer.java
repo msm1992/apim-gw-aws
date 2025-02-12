@@ -1,5 +1,7 @@
 package org.wso2.aws.client;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.osgi.service.component.annotations.Component;
@@ -13,6 +15,9 @@ import org.wso2.carbon.apimgt.impl.deployer.ExternalGatewayDeployer;
 import org.wso2.carbon.apimgt.impl.deployer.exceptions.DeployerException;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,12 +36,13 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
     @Override
     public boolean deploy(API api, Environment environment) throws DeployerException {
         try {
-            String awsApiId = APIUtil.getApiAWSApiMappingByApiId(api.getUuid(), environment.getUuid());
-            if (awsApiId == null) {
-                awsApiId = AWSAPIUtil.importRestAPI(api, environment);
-                APIUtil.addApiAWSApiMapping(api.getUuid(), awsApiId, environment.getUuid());
+            String referenceArtifact = APIUtil.getApiExternalApiMappingReferenceByApiId(api.getUuid(), environment.getUuid());
+            if (referenceArtifact == null) {
+                referenceArtifact = AWSAPIUtil.importRestAPI(api, environment);
+                APIUtil.addApiExternalApiMapping(api.getUuid(), environment.getUuid(), referenceArtifact);
             } else {
-                AWSAPIUtil.reimportRestAPI(awsApiId, api, environment);
+                referenceArtifact = AWSAPIUtil.reimportRestAPI(referenceArtifact, api, environment);
+                APIUtil.updateApiExternalApiMapping(api.getUuid(), environment.getUuid(), referenceArtifact);
             }
             return true;
         } catch (APIManagementException e) {
@@ -84,8 +90,19 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
     }
 
     @Override
-    public String getGatewayFeatureCatalog() {
-        return AWSConstants.AWS_GATEWAY_FEATURES;
+    public JsonObject getGatewayFeatureCatalog() throws DeployerException{
+        try (InputStream inputStream = AWSGatewayDeployer.class.getClassLoader()
+                .getResourceAsStream("GatewayFeatureCatalog.json")) {
+
+            if (inputStream == null) {
+                throw new DeployerException("Gateway Feature Catalog JSON not found");
+            }
+
+            InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
+            return JsonParser.parseReader(reader).getAsJsonObject();
+        } catch (Exception e) {
+            throw new DeployerException("Error while getting Gateway Feature Catalog", e);
+        }
     }
 
     @Override
@@ -107,7 +124,8 @@ public class AWSGatewayDeployer implements ExternalGatewayDeployer {
     public String getAPIExecutionURL(String apiId, String url, Environment environment) throws DeployerException {
         StringBuilder resolvedUrl = new StringBuilder(url);
         try {
-            String awsAPIId = APIUtil.getApiAWSApiMappingByApiId(apiId, environment.getUuid());
+            String referenceArtifact = APIUtil.getApiExternalApiMappingReferenceByApiId(apiId, environment.getUuid());
+            String awsAPIId = GatewayUtil.getAWSApiIdFromReferenceArtifact(referenceArtifact);
 
             //replace {apiId} placeHolder with actual API ID
             int start = resolvedUrl.indexOf("{apiId}");
